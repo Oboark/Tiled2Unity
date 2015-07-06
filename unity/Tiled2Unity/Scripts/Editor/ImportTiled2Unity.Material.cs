@@ -15,6 +15,7 @@ namespace Tiled2Unity
     // Partial class for the importer that deals with Materials
     partial class ImportTiled2Unity
     {
+
         // We need to call this while the renderers on the model is having its material assigned to it
         public Material FixMaterialForMeshRenderer(string objName, Renderer renderer)
         {
@@ -49,6 +50,11 @@ namespace Tiled2Unity
             }
 
             string materialName = match.Attribute("material").Value + ".mat";
+
+			// This step is not necessary for the normal map texture because it does not have its own separate material but is apart of the main texture to which the normal map is to be assigned
+			if (ImportTiled2Unity.ProcessingNormalMaps && materialName.Contains (ImportTiled2Unity.TiledNormalMapFileIdentification))
+				materialName = materialName.Replace (ImportTiled2Unity.TiledNormalMapFileIdentification, String.Empty);
+
             string materialPath = GetMaterialAssetPath(materialName);
 
             // Assign the material

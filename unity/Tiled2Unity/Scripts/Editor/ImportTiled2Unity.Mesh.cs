@@ -14,6 +14,7 @@ namespace Tiled2Unity
     // At this point we should have everything we need to build out any prefabs for the tiled map object
     partial class ImportTiled2Unity
     {
+		public static readonly String TiledGameObjectName_NormalMapLayer = "NormalMapLayer";
         // By the time this is called, our assets should be ready to create the map prefab
         public void MeshImported(string objPath)
         {
@@ -72,6 +73,11 @@ namespace Tiled2Unity
             foreach (XElement goXml in xml.Elements("GameObject"))
             {
                 string name = ImportUtils.GetAttributeAsString(goXml, "name", "");
+
+				// The normal map layer does not need to be included in the mesh. It is only used so that the texture gets imported from tiled to Unity by Tiled2Unity tool
+				if(name.Contains(ImportTiled2Unity.TiledGameObjectName_NormalMapLayer))
+					continue;
+
                 string copyFrom = ImportUtils.GetAttributeAsString(goXml, "copy", "");
 
                 GameObject child = null;
@@ -214,11 +220,8 @@ namespace Tiled2Unity
                 float width = ImportUtils.GetAttributeAsFloat(xmlBoxCollider2D, "width");
                 float height = ImportUtils.GetAttributeAsFloat(xmlBoxCollider2D, "height");
                 collider.size = new Vector2(width, height);
-#if UNITY_5_0
-                collider.offset = new Vector2(width * 0.5f, -height * 0.5f);
-#else
-                collider.center = new Vector2(width * 0.5f, -height * 0.5f);
-#endif
+
+                ImportUtils.SetBoxCollider2DOffset(collider, new Vector2(width * 0.5f, -height * 0.5f));
             }
 
             // Circle colliders
@@ -228,11 +231,8 @@ namespace Tiled2Unity
                 collider.isTrigger = isTrigger;
                 float radius = ImportUtils.GetAttributeAsFloat(xmlCircleCollider2D, "radius");
                 collider.radius = radius;
-#if UNITY_5_0
-                collider.offset = new Vector2(radius, -radius);
-#else
-                collider.center = new Vector2(radius, -radius);
-#endif
+
+                ImportUtils.SetCircleCollider2DOffset(collider, new Vector2(radius, -radius));
             }
 
             // Edge colliders

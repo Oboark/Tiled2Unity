@@ -15,13 +15,17 @@ namespace Tiled2Unity
     // Concentrates on the Xml file being imported
     partial class ImportTiled2Unity
     {
-        public static readonly string ThisVersion = "0.9.11.0";
+        public static readonly string ThisVersion = "0.9.11.1";
+		public static readonly String TiledPropertyName_UseNormalMap = "UseNormalMap";
+		public static readonly String TiledNormalMapFileIdentification = "_n";
+		public static Boolean ProcessingNormalMaps = false;
 
         public void XmlImported(string xmlPath)
         {
             XDocument xml = XDocument.Load(xmlPath);
 
             CheckVersion(xmlPath, xml);
+			CheckIfProcessingNormalMaps (xml);
 
             // Import asset files.
             // (Note that textures should be imported before meshes)
@@ -38,6 +42,23 @@ namespace Tiled2Unity
                 Debug.LogWarning(string.Format("Imported Tiled2Unity file '{0}' was exported with version {1}. We are expecting version {2}", xmlPath, version, ThisVersion));
             }
         }
+
+		private void CheckIfProcessingNormalMaps(XDocument xml)
+		{
+			var prefabProperties = xml.Root.Elements("Prefab").Elements("Property");
+			if (prefabProperties != null && prefabProperties.Count () > 0) {
+				// Check to see if the normal map is defined and wanted to be used.
+				var useNormalMapElement = prefabProperties.SingleOrDefault( o => o.Attribute("name").Value.CompareTo(ImportTiled2Unity.TiledPropertyName_UseNormalMap) == 0);
+				if(useNormalMapElement != null)
+				{
+					// If the value is greater than 1 then the Tiled user intends to use a normal map
+					if(ImportUtils.GetAttributeAsInt(useNormalMapElement, "value") > 0)
+					{
+						ImportTiled2Unity.ProcessingNormalMaps = true;
+					}
+				}
+			}
+		}
 
         private void ImportTexturesFromXml(XDocument xml)
         {
@@ -59,7 +80,8 @@ namespace Tiled2Unity
                     AssetDatabase.ImportAsset(pathToSave, ImportAssetOptions.ForceSynchronousImport);
                 }
 
-                // Create a material if needed in prepartion for the texture being successfully imported
+                // Create a material if needed in prepartion for the texture being successfully imported (NOTICE: Only if this is not a normal map)
+				if(!name.Contains(ImportTiled2Unity.TiledNormalMapFileIdentification))
                 {
                     string materialPath = GetMaterialAssetPath(name);
                     Material material = AssetDatabase.LoadAssetAtPath(materialPath, typeof(Material)) as Material;
@@ -67,7 +89,10 @@ namespace Tiled2Unity
                     {
                         // We need to create the material afterall
                         // Use our custom shader
-                        material = new Material(Shader.Find("Tiled/TextureTintSnap"));
+                        if(ImportTiled2Unity.ProcessingNormalMaps)
+                            material = new Material(Shader.Find("Tiled/TextureTintSnapNormal"));
+                        else
+                            material = new Material(Shader.Find("Tiled/TextureTintSnap"));
                         ImportUtils.ReadyToWrite(materialPath);
                         AssetDatabase.CreateAsset(material, materialPath);
                     }
@@ -81,17 +106,35 @@ namespace Tiled2Unity
             foreach (var tex in texData)
             {
                 string texAssetPath = tex.Attribute("assetPath").Value;
+				// Check to see if normal map processing is necessary and if this is a normal map file. At this stage we only want to load just plain textures which are not normal maps
+				if(ImportTiled2Unity.ProcessingNormalMaps && texAssetPath.Contains(ImportTiled2Unity.TiledNormalMapFileIdentification))
+					continue;
+
                 string materialPath = GetMaterialAssetPath(texAssetPath);
 
                 Material material = AssetDatabase.LoadAssetAtPath(materialPath, typeof(Material)) as Material;
                 if (material == null)
                 {
                     // Create our material
-                    material = new Material(Shader.Find("Tiled/TextureTintSnap"));
+                    if (ImportTiled2Unity.ProcessingNormalMaps)
+                        material = new Material(Shader.Find("Tiled/TextureTintSnapNormal"));
+                    else
+                        material = new Material(Shader.Find("Tiled/TextureTintSnap"));
 
                     // Assign to it the texture that is already internal to our Unity project
                     Texture2D texture2d = AssetDatabase.LoadAssetAtPath(texAssetPath, typeof(Texture2D)) as Texture2D;
                     material.SetTexture("_MainTex", texture2d);
+
+					// Now the normal map file should be searched and loaded AND assigned to the material for shader processing.
+					if(ImportTiled2Unity.ProcessingNormalMaps)
+					{
+						var normalMapAssetPath = texData.SingleOrDefault( o => tex.Attribute("assetPath").Value.Contains(ImportTiled2Unity.TiledNormalMapFileIdentification));
+						if(normalMapAssetPath != null)
+						{
+							Texture2D texture2dNormal = AssetDatabase.LoadAssetAtPath(normalMapAssetPath.Value, typeof(Texture2D)) as Texture2D;
+							material.SetTexture("_BumpMap", texture2dNormal);
+						}
+					}
 
                     // Write the material to our asset database
                     ImportUtils.ReadyToWrite(materialPath);

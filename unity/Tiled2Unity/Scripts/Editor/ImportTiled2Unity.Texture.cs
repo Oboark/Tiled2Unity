@@ -13,10 +13,19 @@ namespace Tiled2Unity
     {
         public void TextureImported(string texturePath)
         {
-            // This is fixup method due to materials and textures, under some conditions, being imported out of order
-            Texture2D texture2d = AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D)) as Texture2D;
-            Material material = AssetDatabase.LoadAssetAtPath(GetMaterialAssetPath(texturePath), typeof(Material)) as Material;
-            material.SetTexture("_MainTex", texture2d);
+			// Check to see if this is a normal map and get the texture associated with the normal map and the material.
+			if (ImportTiled2Unity.ProcessingNormalMaps && texturePath.Contains (ImportTiled2Unity.TiledNormalMapFileIdentification)) {
+				// This is fixup method due to materials and textures, under some conditions, being imported out of order
+				Texture2D texture2d = AssetDatabase.LoadAssetAtPath (texturePath, typeof(Texture2D)) as Texture2D;
+				Material material = AssetDatabase.LoadAssetAtPath (GetMaterialAssetPath (texturePath.Replace(ImportTiled2Unity.TiledNormalMapFileIdentification, String.Empty)), typeof(Material)) as Material;
+				material.SetTexture ("_BumpMap", texture2d);
+			} else {
+
+				// This is fixup method due to materials and textures, under some conditions, being imported out of order
+				Texture2D texture2d = AssetDatabase.LoadAssetAtPath (texturePath, typeof(Texture2D)) as Texture2D;
+				Material material = AssetDatabase.LoadAssetAtPath (GetMaterialAssetPath (texturePath), typeof(Material)) as Material;
+				material.SetTexture ("_MainTex", texture2d);
+			}
         }
     }
 }
